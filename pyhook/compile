@@ -1,0 +1,10 @@
+#!/bin/bash
+
+
+
+mvn clean install
+find ../installer -name "*.jar" -exec rm {} \;
+cp target/pyhook*.jar ../installer/
+./zip
+
+#find target -name "pyhook*.jar" -exec cp {} ../../installer \;

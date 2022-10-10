@@ -1,0 +1,4 @@
+name: pyhook
+main: com.moonymax.pyhook.Plugin
+version: 0.1
+api-version: 1.15

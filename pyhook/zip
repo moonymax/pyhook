@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cd target
+fname=$(find . -name 'pyhook*.jar')
+cd ../../installer
+find . -name "*.zip" -exec rm {} \;
+zip -r "${fname::-4}.zip" ./
