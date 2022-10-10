@@ -1,11 +1,17 @@
 package com.moonymax.pyhook;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.lang.ProcessBuilder.Redirect;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -27,6 +33,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ClassInfoList;
+import py4j.ClientServer;
 import py4j.GatewayServer;
 import py4j.reflection.ReflectionUtil;
 import py4j.reflection.RootClassLoadingStrategy;
@@ -40,6 +47,7 @@ public class Plugin extends JavaPlugin implements Listener, EventExecutor {
 
   EventListener listener;
   Process process;
+  ClientServer clientServer;
 
   List<BukkitCommand> commands = new ArrayList<>();
 
@@ -101,14 +109,9 @@ public class Plugin extends JavaPlugin implements Listener, EventExecutor {
   public void execute(Listener listener, Event event) throws EventException {
     // listener is null when python isnt running yet
     if (this.listener != null) {
-      Object returnValue = this.listener.onEvent(event);
-      event = (Event) returnValue;
+      Object returnValue = this.listener.onEvent(this, "SpigotEvent", event);
+      // event = (Event) returnValue;
     }
-  }
-
-  public Plugin registerListener(EventListener listener) {
-    this.listener = listener;
-    return this;
   }
 
   @Override
@@ -159,16 +162,25 @@ public class Plugin extends JavaPlugin implements Listener, EventExecutor {
     RootClassLoadingStrategy rmmClassLoader = new RootClassLoadingStrategy();
     ReflectionUtil.setClassLoadingStrategy(rmmClassLoader);
 
-    GatewayServer server = new GatewayServer(this);
-    server.start(true);
-
     ProcessBuilder processBuilder = new ProcessBuilder().command("./venv/bin/python", "pyhook.py");
+    processBuilder.redirectOutput(Redirect.INHERIT);
+    processBuilder.redirectError(Redirect.INHERIT);
 
     try {
       process = processBuilder.start();
     } catch (IOException e) {
       LOGGER.log(Level.SEVERE, "Failed to start python process!\n" + e.getMessage());
     }
+    try {
+      Thread.sleep(2000);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    // start connection from here
+    clientServer = new ClientServer(null);
+
+    listener = (EventListener) clientServer.getPythonServerEntryPoint(new Class[] { EventListener.class });
+    listener.onEvent(this, "EnableEvent", null);
 
     LOGGER.info("pyhook enabled");
   }
@@ -176,8 +188,9 @@ public class Plugin extends JavaPlugin implements Listener, EventExecutor {
   @Override
   public void onDisable() {
     if (this.listener != null) {
-      this.listener.onEvent("stop");
+      this.listener.onEvent(this, "stop", null);
     }
+    clientServer.shutdown();
     try {
       process.waitFor(3, TimeUnit.SECONDS);
     } catch (Exception e) {
@@ -185,8 +198,9 @@ public class Plugin extends JavaPlugin implements Listener, EventExecutor {
           "Java main process was interupted while waiting for python process to finish\n"
               + e.getMessage());
       e.printStackTrace();
+      process.destroy();
     }
-    process.destroy();
+
     LOGGER.info("pyhook disabled");
   }
 

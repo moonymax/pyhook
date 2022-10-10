@@ -35,7 +35,7 @@ public class DynamicCommand extends BukkitCommand {
     @Override
     public boolean execute(CommandSender sender, String name, String[] args) {
         if (plugin.listener != null) {
-            Object returnValue = plugin.listener.onEvent(new CommandObject(sender, name, args));
+            Object returnValue = plugin.listener.onEvent(plugin, "CommandEvent", new CommandObject(sender, name, args));
         }
         return true;
 
