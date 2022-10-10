@@ -1,5 +1,8 @@
+from tkinter import E
 from py4j.java_gateway import JavaGateway, CallbackServerParameters, Py4JNetworkError
+from py4j.clientserver import ClientServer, JavaParameters, PythonParameters
 import importlib.util
+import traceback
 import os
 import time
 import logging
@@ -11,7 +14,7 @@ specs = {}
 plugins = {}
 scriptsPath = 'pyplugins/'
 
-javaPluginRef = None
+gateway = None
 
 stop = False
 
@@ -33,24 +36,33 @@ def callplugins(functionname, **args):
 
 class PythonListener(object):
 
-    def __init__(self, gateway):
-        self.gateway = gateway
+    def __init__(self):
+        pass
 
-    def onEvent(self, event):
-        if(event == "stop"):
-            self.gateway.shutdown()
-            global stop
-            stop = True
-            return
-        if(event.getEventName() == 'onCommand'):
-            sender = event.getSender()
-            name = event.getName()
-            args = event.getArgs()
-            callplugins('on'+(name.capitalize())+'Cmd', gateway=self.gateway,
-                        pyhook=javaPluginRef, sender=sender, name=name, arguments=args)
-            return
-        callplugins(event.getEventName(), gateway=self.gateway,
-                    pyhook=javaPluginRef, event=event)
+    def onEvent(self, pluginRef, eventName, event):
+        try:
+            global gateway
+            if(eventName == "stop"):
+                self.gateway.shutdown()
+                global stop
+                stop = True
+                return
+            if(eventName == "EnableEvent"):
+                callplugins('onEnable', plugin=pluginRef, gateway=gateway)
+                return
+
+            if(eventName == 'CommandEvent'):
+                sender = event.getSender()
+                name = event.getName()
+                args = event.getArgs()
+                callplugins('on'+(name.capitalize())+'Cmd',
+                            plugin=pluginRef, gateway=gateway, sender=sender, name=name, arguments=args)
+                return
+            if(eventName == "SpigotEvent"):
+                callplugins(event.getEventName(),
+                            plugin=pluginRef, gateway=gateway, event=event)
+        except Exception as e:
+            print(e)
         return event
 
     class Java:
@@ -58,26 +70,38 @@ class PythonListener(object):
 
 
 # if __name__ == "__main__":
-
-gateway = JavaGateway(
-    callback_server_parameters=CallbackServerParameters())
-while not stop:
-    try:
-        gateway.jvm.System.getProperty("java.runtime.name")
-        print('JVM accepted connection')
-        listener = PythonListener(gateway)
-        javaPluginRef = gateway.entry_point.registerListener(listener)
-        callplugins('onEnable', gateway=gateway, pyhook=javaPluginRef)
-        stop = True
-    except Py4JNetworkError:
-        print('No JVM listenting')
-        time.sleep(1)
-    except Exception:
-        gateway.shutdown()
-        stop = True
-        pass
-#gateway.jvm.System.out.println("Hello from python!")
+def main():
+    global stop
+    global gateway
+    listener = PythonListener()
+    gateway = ClientServer(
+        java_parameters=JavaParameters(),
+        python_parameters=PythonParameters(),
+        python_server_entry_point=listener
+        # callback_server_parameters=CallbackServerParameters()
+    )
 
 
-# gateway.entry_point.notifyAllListeners()
-# gateway.shutdown()
+"""
+    while not stop:
+        try:
+            gateway.jvm.System.getProperty("java.runtime.name")
+            print('JVM accepted connection')
+            global javaPluginRef
+            javaPluginRef = gateway.entry_point.registerListener(listener)
+            stop = True
+        except Py4JNetworkError:
+            print('No JVM listenting')
+            time.sleep(1)
+        except Exception:
+            gateway.shutdown()
+            stop = True
+            pass
+    # gateway.jvm.System.out.println("Hello from python!")
+
+    # gateway.entry_point.notifyAllListeners()
+    # gateway.shutdown()
+    """
+
+
+main()
