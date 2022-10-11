@@ -1,10 +1,8 @@
 from tkinter import E
-from py4j.java_gateway import JavaGateway, CallbackServerParameters, Py4JNetworkError
+from py4j.java_gateway import JavaGateway, CallbackServerParameters, Py4JNetworkError, get_field, set_field
 from py4j.clientserver import ClientServer, JavaParameters, PythonParameters
 import importlib.util
-import traceback
 import os
-import time
 import logging
 
 logging.basicConfig(filename='pyhook.log', filemode='w',
@@ -42,15 +40,13 @@ class PythonListener(object):
     def onEvent(self, pluginRef, eventName, event):
         try:
             global gateway
-            if(eventName == "stop"):
-                self.gateway.shutdown()
-                global stop
-                stop = True
-                return
             if(eventName == "EnableEvent"):
                 callplugins('onEnable', plugin=pluginRef, gateway=gateway)
                 return
-
+            if(eventName == "DisableEvent"):
+                callplugins('onDisable', plugin=pluginRef, gateway=gateway)
+                gateway.shutdown()
+                return
             if(eventName == 'CommandEvent'):
                 sender = event.getSender()
                 name = event.getName()
@@ -77,31 +73,7 @@ def main():
     gateway = ClientServer(
         java_parameters=JavaParameters(),
         python_parameters=PythonParameters(),
-        python_server_entry_point=listener
-        # callback_server_parameters=CallbackServerParameters()
-    )
-
-
-"""
-    while not stop:
-        try:
-            gateway.jvm.System.getProperty("java.runtime.name")
-            print('JVM accepted connection')
-            global javaPluginRef
-            javaPluginRef = gateway.entry_point.registerListener(listener)
-            stop = True
-        except Py4JNetworkError:
-            print('No JVM listenting')
-            time.sleep(1)
-        except Exception:
-            gateway.shutdown()
-            stop = True
-            pass
-    # gateway.jvm.System.out.println("Hello from python!")
-
-    # gateway.entry_point.notifyAllListeners()
-    # gateway.shutdown()
-    """
+        python_server_entry_point=listener)
 
 
 main()

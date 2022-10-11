@@ -2,7 +2,6 @@ plugin = None
 
 
 def onEnable(**kwargs):  # is called when the connection to java was established
-    print('this is a bit odd')
     global plugin
     plugin = kwargs['plugin']
     plugin.registerCommand("test", "Usage: /test",

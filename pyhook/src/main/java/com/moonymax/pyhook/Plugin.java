@@ -46,6 +46,7 @@ public class Plugin extends JavaPlugin implements Listener, EventExecutor {
   private static final Logger LOGGER = Logger.getLogger("pyhook");
 
   EventListener listener;
+  boolean listening = false;
   Process process;
   ClientServer clientServer;
 
@@ -108,7 +109,7 @@ public class Plugin extends JavaPlugin implements Listener, EventExecutor {
   @Override
   public void execute(Listener listener, Event event) throws EventException {
     // listener is null when python isnt running yet
-    if (this.listener != null) {
+    if (listening) {
       Object returnValue = this.listener.onEvent(this, "SpigotEvent", event);
       // event = (Event) returnValue;
     }
@@ -171,35 +172,46 @@ public class Plugin extends JavaPlugin implements Listener, EventExecutor {
     } catch (IOException e) {
       LOGGER.log(Level.SEVERE, "Failed to start python process!\n" + e.getMessage());
     }
-    try {
-      Thread.sleep(2000);
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
     // start connection from here
     clientServer = new ClientServer(null);
+    while (!listening) {
+      try {
 
-    listener = (EventListener) clientServer.getPythonServerEntryPoint(new Class[] { EventListener.class });
-    listener.onEvent(this, "EnableEvent", null);
+        listener = (EventListener) clientServer.getPythonServerEntryPoint(new Class[] { EventListener.class });
+        listener.onEvent(this, "EnableEvent", null);
+        listening = true;
+      } catch (Exception e) {
+        System.out.println("Python did not start yet");
+        try {
+          Thread.sleep(1000);
+        } catch (Exception interupted) {
+          interupted.printStackTrace();
+        }
+      }
+    }
 
     LOGGER.info("pyhook enabled");
+
   }
 
   @Override
   public void onDisable() {
-    if (this.listener != null) {
-      this.listener.onEvent(this, "stop", null);
+    if (listening) {
+      this.listener.onEvent(this, "DisableEvent", null);
     }
-    clientServer.shutdown();
     try {
-      process.waitFor(3, TimeUnit.SECONDS);
+      process.destroy();
+      if (process.waitFor(3, TimeUnit.SECONDS) != true) {
+        process.destroyForcibly();
+      }
     } catch (Exception e) {
       LOGGER.log(Level.SEVERE,
           "Java main process was interupted while waiting for python process to finish\n"
               + e.getMessage());
       e.printStackTrace();
-      process.destroy();
+      process.destroyForcibly();
     }
+    clientServer.shutdown();
 
     LOGGER.info("pyhook disabled");
   }
