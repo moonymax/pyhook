@@ -1,4 +1,7 @@
 # Pyhook
+
+Because noone should ever have to use java
+
 Spigot plugins in python with Py4J
 
 ### Events
